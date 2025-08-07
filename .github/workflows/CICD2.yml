@@ -2,32 +2,27 @@ name: CI/CD Pipeline with Terraform
 
 on:
   push:
-    branches: 
+    branches:
       - master
 
 jobs:
   terraform:
+    name: Terraform Infrastructure Deployment
     runs-on: self-hosted
     defaults:
       run:
         working-directory: ${{ runner.workspace }}/3tier_app/infrastructure
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
         with:
-          path: 3tier_app  # Ensures proper directory structure
-
-      - name: Verify paths
-        run: |
-          echo "Runner workspace: ${{ runner.workspace }}"
-          echo "Working directory: $(pwd)"
-          ls -laR ${{ runner.workspace }}
-          which bash
+          path: 3tier_app  # Ensures all relative paths are resolved correctly
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.12.2
+          terraform_version: 1.7.5  # Recommend using latest stable, not 1.12.2
 
       - name: Terraform Init
         run: terraform init
@@ -39,22 +34,35 @@ jobs:
         run: terraform apply -auto-approve
 
   deploy:
+    name: Build, Scan, and Deploy
     runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v4
+    needs: terraform  # Wait for infrastructure setup
+    defaults:
+      run:
+        working-directory: ${{ runner.workspace }}/3tier_app
 
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: 3tier_app
+
+      # ---------- SonarQube Scan ----------
       - name: SonarQube Scan
         uses: sonarsource/sonarcloud-github-action@master
         with:
           args: >
             -Dsonar.projectKey=my-project
+            -Dsonar.organization=my-org
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
+      # ---------- Install Trivy ----------
       - name: Install Trivy
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
           sudo mv trivy /usr/local/bin/trivy
 
+      # ---------- AWS & ECR ----------
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -65,7 +73,8 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build and Push Frontend
+      # ---------- Frontend ----------
+      - name: Build and Push Frontend Image
         run: |
           cd frontend
           docker build -t frontend .
@@ -73,7 +82,8 @@ jobs:
           docker tag frontend:latest 958978679682.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
           docker push 958978679682.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
 
-      - name: Build and Push Backend
+      # ---------- Backend ----------
+      - name: Build and Push Backend Image
         run: |
           cd backend
           docker build -t backend .
@@ -81,11 +91,11 @@ jobs:
           docker tag backend:latest 958978679682.dkr.ecr.us-east-1.amazonaws.com/backend:latest
           docker push 958978679682.dkr.ecr.us-east-1.amazonaws.com/backend:latest
 
-      - name: Update kubeconfig
-        run: |
-          aws eks update-kubeconfig --name my-eks-cluster --region us-east-1
+      # ---------- Deploy to Kubernetes ----------
+      - name: Update Kubeconfig
+        run: aws eks update-kubeconfig --name my-eks-cluster --region us-east-1
 
-      - name: Deploy to Kubernetes
+      - name: Apply Kubernetes Manifests
         run: |
           cd manifests
           kubectl apply -f db-secret.yaml
