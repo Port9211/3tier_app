@@ -70,8 +70,8 @@ jobs:
         run: |
           docker build -t frontend ./frontend
           trivy image frontend
-          docker tag frontend:latest <aws_account_id>.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
-          docker push <aws_account_id>.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
+          docker tag frontend:latest 958978679682.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
+          docker push 958978679682.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
 
       #####################################
       # Build & Push Backend
@@ -80,8 +80,8 @@ jobs:
         run: |
           docker build -t backend ./backend
           trivy image backend
-          docker tag backend:latest <aws_account_id>.dkr.ecr.us-east-1.amazonaws.com/backend:latest
-          docker push <aws_account_id>.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+          docker tag backend:latest 958978679682.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+          docker push 958978679682.dkr.ecr.us-east-1.amazonaws.com/backend:latest
 
       #####################################
       # Update kubeconfig & Deploy to EKS
