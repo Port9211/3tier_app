@@ -9,7 +9,7 @@ jobs:
   deploy:
     runs-on: self-hosted
 
-    # ✅ Set default working directory for all run steps
+    #  Set default working directory for all run steps
     defaults:
       run:
         working-directory: ./infrastructure
