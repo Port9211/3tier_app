@@ -39,7 +39,7 @@ jobs:
     needs: terraform  # Wait for infrastructure setup
     defaults:
       run:
-        working-directory: ${{ runner.workspace }}/3tier_app
+        working-directory: ${{ github.workspace }}/3tier_app
 
     steps:
       - name: Checkout Code
