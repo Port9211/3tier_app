@@ -6,19 +6,24 @@ on:
       - master
 
 jobs:
-  deploy:
+  #####################################
+  # Terraform Job
+  #####################################
+  terraform:
     runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: ./3tier_app/infrastructure
 
     steps:
-      #####################################
-      # Checkout Source Code
-      #####################################
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      #####################################
-      # Setup Terraform
-      #####################################
+      - name: Verify directory structure
+        run: |
+          echo "Current path: $(pwd)"
+          ls -R
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -26,16 +31,23 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
-        working-directory: 3tier_app/infrastructure
-
 
       - name: Terraform Plan
         run: terraform plan
-        working-directory: 3tier_app/infrastructure
 
       - name: Terraform Apply
         run: terraform apply -auto-approve
-        working-directory: 3tier_app/infrastructure
+
+  #####################################
+  # Deploy Job - depends on terraform
+  #####################################
+  deploy:
+    runs-on: self-hosted
+    needs: terraform
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       #####################################
       # SonarQube Scan
@@ -73,7 +85,7 @@ jobs:
       #####################################
       - name: Build and Push Frontend
         run: |
-          docker build -t frontend ./frontend
+          docker build -t frontend ./3tier_app/frontend
           trivy image frontend
           docker tag frontend:latest 958978679682.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
           docker push 958978679682.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
@@ -83,7 +95,7 @@ jobs:
       #####################################
       - name: Build and Push Backend
         run: |
-          docker build -t backend ./backend
+          docker build -t backend ./3tier_app/backend
           trivy image backend
           docker tag backend:latest 958978679682.dkr.ecr.us-east-1.amazonaws.com/backend:latest
           docker push 958978679682.dkr.ecr.us-east-1.amazonaws.com/backend:latest
@@ -96,6 +108,6 @@ jobs:
 
       - name: Deploy to Kubernetes
         run: |
-          kubectl apply -f manifests/db-secret.yaml
-          kubectl apply -f manifests/backend.yaml
-          kubectl apply -f manifests/frontend.yaml
+          kubectl apply -f ./3tier_app/manifests/db-secret.yaml
+          kubectl apply -f ./3tier_app/manifests/backend.yaml
+          kubectl apply -f ./3tier_app/manifests/frontend.yaml
