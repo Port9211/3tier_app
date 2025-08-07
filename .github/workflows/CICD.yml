@@ -2,20 +2,13 @@ name: CI/CD Pipeline with Terraform
 
 on:
   push:
-    branches: 
+    branches:
       - master
 
 jobs:
- #deploy-terraform:
-    name: Run terraform
+  deploy:
     runs-on: self-hosted
-   # env:
-     # TF_DIR: terraform/${{ inputs.env }}
-      # AWS_REGION: ${{ inputs.region }}
 
-   deploy:
-     runs-on: self-hosted
-    
     steps:
       #####################################
       # Checkout Source Code
@@ -23,20 +16,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # ✅ Optional Debug Step
-      - name: Show folder structure
-        run: |
-          echo "Current dir: $(pwd)"
-          echo "Repo structure:"
-          ls -R
-
       #####################################
-      # Terraform Initialization & Apply
+      # Setup Terraform
       #####################################
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.12.2
+          terraform_version: 1.7.5
 
       - name: Terraform Init
         run: terraform init
@@ -57,7 +43,7 @@ jobs:
         uses: sonarsource/sonarcloud-github-action@master
         with:
           args: >
-            -Dsonar.projectKey=my-project
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
       #####################################
@@ -66,7 +52,7 @@ jobs:
       - name: Install Trivy
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
-          sudo mv trivy /usr/local/bin/trivy
+          sudo install -m 755 trivy /usr/local/bin/trivy
 
       #####################################
       # AWS Configuration & ECR Login
