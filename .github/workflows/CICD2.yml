@@ -1,0 +1,113 @@
+name: CI/CD Pipeline with Terraform
+
+on:
+  push:
+    branches: 
+      - master
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    # ✅ Set default working directory for all run steps
+    defaults:
+      run:
+        working-directory: infrastructure
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # ✅ Debug: Check actual folder structure
+      - name: Verify directory
+        run: |
+          echo "PWD = $(pwd)"
+          echo "Repo content:"
+          ls -la
+          echo "Infrastructure dir:"
+          ls -la infrastructure
+
+      #####################################
+      # Terraform Initialization & Apply
+      #####################################
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+
+      #####################################
+      # SonarQube Scan
+      #####################################
+      - name: SonarQube Scan
+        uses: sonarsource/sonarcloud-github-action@master
+        with:
+          args: >
+            -Dsonar.projectKey=my-project
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+      #####################################
+      # Install Trivy
+      #####################################
+      - name: Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
+          sudo mv trivy /usr/local/bin/trivy
+
+      #####################################
+      # AWS Configuration & ECR Login
+      #####################################
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      #####################################
+      # Build & Push Frontend
+      #####################################
+      - name: Build and Push Frontend
+        run: |
+          cd ../frontend
+          docker build -t frontend .
+          trivy image frontend
+          docker tag frontend:latest 958978679682.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
+          docker push 958978679682.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
+
+      #####################################
+      # Build & Push Backend
+      #####################################
+      - name: Build and Push Backend
+        run: |
+          cd ../backend
+          docker build -t backend .
+          trivy image backend
+          docker tag backend:latest 958978679682.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+          docker push 958978679682.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+
+      #####################################
+      # Update kubeconfig & Deploy to EKS
+      #####################################
+      - name: Update kubeconfig
+        run: |
+          cd ..
+          aws eks update-kubeconfig --name my-eks-cluster --region us-east-1
+
+      - name: Deploy to Kubernetes
+        run: |
+          cd manifests
+          kubectl apply -f db-secret.yaml
+          kubectl apply -f backend.yaml
+          kubectl apply -f frontend.yaml
