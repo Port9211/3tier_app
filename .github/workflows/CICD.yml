@@ -1,17 +1,40 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline with Terraform
 
 on:
   push:
     branches: [master]
 
 jobs:
-  build-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
 
+      #####################################
+      # Terraform Initialization & Apply
+      #####################################
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: infrastructure
+
+      - name: Terraform Plan
+        run: terraform plan
+        working-directory: infrastructure
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+        working-directory: infrastructure
+
+      #####################################
+      # SonarQube Scan
+      #####################################
       - name: SonarQube Scan
         uses: sonarsource/sonarcloud-github-action@master
         with:
@@ -19,11 +42,17 @@ jobs:
             -Dsonar.projectKey=my-project
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
+      #####################################
+      # Install Trivy
+      #####################################
       - name: Install Trivy
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
           sudo mv trivy /usr/local/bin/trivy
 
+      #####################################
+      # AWS Configuration & ECR Login
+      #####################################
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -34,6 +63,9 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v1
 
+      #####################################
+      # Build & Push Frontend
+      #####################################
       - name: Build and Push Frontend
         run: |
           docker build -t frontend ./frontend
@@ -41,6 +73,9 @@ jobs:
           docker tag frontend:latest <aws_account_id>.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
           docker push <aws_account_id>.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
 
+      #####################################
+      # Build & Push Backend
+      #####################################
       - name: Build and Push Backend
         run: |
           docker build -t backend ./backend
@@ -48,6 +83,9 @@ jobs:
           docker tag backend:latest <aws_account_id>.dkr.ecr.us-east-1.amazonaws.com/backend:latest
           docker push <aws_account_id>.dkr.ecr.us-east-1.amazonaws.com/backend:latest
 
+      #####################################
+      # Update kubeconfig & Deploy to EKS
+      #####################################
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name my-eks-cluster --region us-east-1
 
