@@ -12,21 +12,25 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+      - name: Verify directory
+        run: |
+          pwd
+          ls -la
 
       # ✅ Debug: Show repo structure
-      - name: Print Directory Structure
-        run: |
-          echo "Current Directory: $(pwd)"
-          echo "List contents:"
-          ls -R
+      # - name: Print Directory Structure
+        # run: |
+          # echo "Current Directory: $(pwd)"
+          # echo "List contents:"
+          # ls -R
 
       #####################################
       # Terraform Initialization & Apply
       #####################################
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.12.2
+      # - name: Setup Terraform
+        # uses: hashicorp/setup-terraform@v3
+        # with:
+          # terraform_version: 1.12.2
 
       - name: Terraform Init
         run: terraform init
