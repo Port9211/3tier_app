@@ -2,7 +2,8 @@ name: CI/CD Pipeline with Terraform
 
 on:
   push:
-    branches: [master]
+    branches: 
+      - master
 
 jobs:
   deploy:
