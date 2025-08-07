@@ -16,8 +16,7 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          path: 3tier_app  # Ensures all relative paths are resolved correctly
+          # Ensures all relative paths are resolved correctly
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
