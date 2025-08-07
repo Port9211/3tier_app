@@ -13,6 +13,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
+      # ✅ Debug: Show repo structure
+      - name: Print Directory Structure
+        run: |
+          echo "Current Directory: $(pwd)"
+          echo "List contents:"
+          ls -R
+
       #####################################
       # Terraform Initialization & Apply
       #####################################
