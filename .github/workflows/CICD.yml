@@ -6,15 +6,15 @@ on:
       - master
 
 jobs:
- deploy-terraform:
+ #deploy-terraform:
     name: Run terraform
     runs-on: self-hosted
    # env:
      # TF_DIR: terraform/${{ inputs.env }}
       # AWS_REGION: ${{ inputs.region }}
 
-  #deploy:
-    #runs-on: self-hosted
+   deploy:
+     runs-on: self-hosted
     
     steps:
       #####################################
