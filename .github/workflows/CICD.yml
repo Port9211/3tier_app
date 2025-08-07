@@ -8,16 +8,16 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
-     defaults:
-      run:
+     #defaults:
+      #run:
         # Use relative path from repository root
-        working-directory: infrastructure
+        #working-directory: infrastructure
     
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
-      - name: Verify directory
-        run: |
+     # - name: Verify directory
+       # run: |
           pwd
           ls -la
 
@@ -31,14 +31,14 @@ jobs:
       #####################################
       # Terraform Initialization & Apply
       #####################################
-      # - name: Setup Terraform
-        # uses: hashicorp/setup-terraform@v3
-        # with:
-          # terraform_version: 1.12.2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+         with:
+          terraform_version: 1.12.2
 
       - name: Terraform Init
         run: terraform init
-        # working-directory: infrastructure
+        working-directory: infrastructure
 
       - name: Terraform Plan
         run: terraform plan
