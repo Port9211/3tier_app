@@ -8,6 +8,10 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
+     defaults:
+      run:
+        # Use relative path from repository root
+        working-directory: infrastructure
     
     steps:
       - name: Checkout Code
