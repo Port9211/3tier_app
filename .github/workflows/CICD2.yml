@@ -12,7 +12,7 @@ jobs:
     # ✅ Set default working directory for all run steps
     defaults:
       run:
-        working-directory: infrastructure
+        working-directory: ./infrastructure
 
     steps:
       - name: Checkout Code
@@ -25,7 +25,7 @@ jobs:
           echo "Repo content:"
           ls -la
           echo "Infrastructure dir:"
-          ls -la infrastructure
+          ls -la ./infrastructure
 
       #####################################
       # Terraform Initialization & Apply
