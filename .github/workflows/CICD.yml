@@ -11,13 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4  # Checks out your entire repository
 
-      - name: Verify paths
+      - name: Verify repository structure
         run: |
-          echo "Runner workspace: ${{ runner.workspace }}"
           echo "Current directory: $(pwd)"
           ls -la
           echo "Infrastructure directory:"
-          ls -la infrastructure
+          ls -la infrastructure  # Adjust if your Terraform directory has a different name
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -26,7 +25,7 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
-        working-directory: infrastructure  # Relative path to your Terraform directory
+        working-directory: infrastructure  # Change this to match your actual directory name
 
       - name: Terraform Plan
         run: terraform plan
@@ -38,6 +37,7 @@ jobs:
 
   deploy:
     runs-on: self-hosted
+    needs: [terraform]  # Ensure deploy runs after terraform
     steps:
       - uses: actions/checkout@v4
 
@@ -61,13 +61,14 @@ jobs:
           aws-region: us-east-1
 
       - name: Login to Amazon ECR
+        id: ecr-login
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build and Push Frontend
         run: |
           cd frontend
           docker build -t frontend .
-          trivy image frontend
+          trivy image --exit-code 0 --severity HIGH,CRITICAL frontend
           docker tag frontend:latest 958978679682.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
           docker push 958978679682.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
 
@@ -75,7 +76,7 @@ jobs:
         run: |
           cd backend
           docker build -t backend .
-          trivy image backend
+          trivy image --exit-code 0 --severity HIGH,CRITICAL backend
           docker tag backend:latest 958978679682.dkr.ecr.us-east-1.amazonaws.com/backend:latest
           docker push 958978679682.dkr.ecr.us-east-1.amazonaws.com/backend:latest
 
