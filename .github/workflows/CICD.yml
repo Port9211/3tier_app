@@ -9,14 +9,24 @@ jobs:
   terraform:
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4  # Checks out your entire repository
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get full history for Terraform state management
 
-      - name: Verify repository structure
+      - name: Verify Directory Structure
         run: |
+          echo "Workspace: ${{ runner.workspace }}"
+          echo "GitHub Workspace: ${{ github.workspace }}"
           echo "Current directory: $(pwd)"
           ls -la
-          echo "Infrastructure directory:"
-          ls -la infrastructure  # Adjust if your Terraform directory has a different name
+          echo "Checking infrastructure directory:"
+          if [ -d "infrastructure" ]; then
+            ls -la infrastructure
+          else
+            echo "Error: Infrastructure directory not found!"
+            exit 1
+          fi
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -24,22 +34,38 @@ jobs:
           terraform_version: 1.12.2
 
       - name: Terraform Init
-        run: terraform init
-        working-directory: infrastructure  # Change this to match your actual directory name
+        run: |
+          cd infrastructure || exit 1
+          terraform init
+        shell: bash
 
       - name: Terraform Plan
-        run: terraform plan
-        working-directory: infrastructure
+        run: |
+          cd infrastructure || exit 1
+          terraform plan
+        shell: bash
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve
-        working-directory: infrastructure
+        run: |
+          cd infrastructure || exit 1
+          terraform apply -auto-approve
+        shell: bash
 
   deploy:
     runs-on: self-hosted
     needs: [terraform]  # Ensure deploy runs after terraform
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Verify Repository Structure
+        run: |
+          echo "Current directory: $(pwd)"
+          ls -la
+          echo "Required directories:"
+          [ -d "frontend" ] && echo "frontend exists" || echo "frontend missing"
+          [ -d "backend" ] && echo "backend exists" || echo "backend missing"
+          [ -d "manifests" ] && echo "manifests exists" || echo "manifests missing"
 
       - name: SonarQube Scan
         uses: sonarsource/sonarcloud-github-action@master
@@ -50,8 +76,9 @@ jobs:
 
       - name: Install Trivy
         run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
-          sudo mv trivy /usr/local/bin/trivy
+          sudo curl -sfL https://github.com/aquasecurity/trivy/releases/latest/download/trivy_linux_$(dpkg --print-architecture).deb -o trivy.deb
+          sudo dpkg -i trivy.deb
+          trivy --version
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -61,31 +88,43 @@ jobs:
           aws-region: us-east-1
 
       - name: Login to Amazon ECR
-        id: ecr-login
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build and Push Frontend
         run: |
+          if [ ! -d "frontend" ]; then
+            echo "##[error]Frontend directory not found!"
+            exit 1
+          fi
           cd frontend
-          docker build -t frontend .
+          docker build -t frontend . || exit 1
           trivy image --exit-code 0 --severity HIGH,CRITICAL frontend
           docker tag frontend:latest 958978679682.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
           docker push 958978679682.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
 
       - name: Build and Push Backend
         run: |
+          if [ ! -d "backend" ]; then
+            echo "##[error]Backend directory not found!"
+            exit 1
+          fi
           cd backend
-          docker build -t backend .
+          docker build -t backend . || exit 1
           trivy image --exit-code 0 --severity HIGH,CRITICAL backend
           docker tag backend:latest 958978679682.dkr.ecr.us-east-1.amazonaws.com/backend:latest
           docker push 958978679682.dkr.ecr.us-east-1.amazonaws.com/backend:latest
 
-      - name: Update kubeconfig
+      - name: Configure Kubernetes Access
         run: |
           aws eks update-kubeconfig --name my-eks-cluster --region us-east-1
+          kubectl cluster-info
 
       - name: Deploy to Kubernetes
         run: |
+          if [ ! -d "manifests" ]; then
+            echo "##[error]Manifests directory not found!"
+            exit 1
+          fi
           cd manifests
           kubectl apply -f db-secret.yaml
           kubectl apply -f backend.yaml
